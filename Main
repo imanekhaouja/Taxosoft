@@ -1,0 +1,10 @@
+from taxosoft import Alt_Words
+from gensim.models import Word2Vec
+
+if __name__ == "__main__": 
+    #we load the word embedding model
+    model =   Word2Vec.load("ejobvector200d")
+    words=['negotiation','teamwork']    
+    for word in words:
+        rterms = Alt_Words( word, model)
+        print(rterms)
