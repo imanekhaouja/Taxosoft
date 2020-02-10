@@ -1,0 +1,84 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Feb 07 11:45:04 2020
+
+@author: Imane
+"""
+
+import re
+from gensim.models import Word2Vec
+from SPARQLWrapper import SPARQLWrapper, JSON
+
+#extract related words from DBpedia
+def dbpedia(term):
+    term = term.strip()
+    nterm = term.capitalize().replace(' ', '_')
+    query = """
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    SELECT ?label
+    WHERE
+    {
+     {
+     <http://dbpedia.org/resource/VALUE> <http://dbpedia.org/ontology/wikiPageWikiLink> ?x.
+     ?x rdfs:label ?label.
+     }
+      UNION
+     {
+     ?x <http://dbpedia.org/ontology/wikiPageWikiLink> <http://dbpedia.org/resource/VALUE>.
+     ?x rdfs:label ?label.
+     }
+     FILTER (lang(?label) = 'en')
+    }
+
+        """
+
+    nquery = query.replace('VALUE', nterm)
+
+    sparql = SPARQLWrapper("http://dbpedia.org/sparql")
+    sparql.setQuery(nquery)
+    wikiwords= []
+    sparql.setReturnFormat(JSON)
+    try:
+        ret = sparql.query()
+        results = ret.convert()
+        requestGood = True
+    except Exception as e:
+        results = str(e)
+        requestGood = False
+
+    if requestGood == False:
+        print("Problem communicating with the server: ", results)
+    elif (len(results["results"]["bindings"]) == 0):
+        print( "No results found")
+    else:
+        for result in results["results"]["bindings"]:
+            label = result["label"]["value"].encode('utf-8')
+            wikiwords.append(label)
+           
+    return wikiwords
+
+#combine Word2vec model and DBpedia
+def Alt_Words(word, model, c=0.3):
+    wikiwords = dbpedia(word)
+    rterms = []   
+    
+    for item in wikiwords:
+        item=str(item,'utf-8')
+        iitem = item.lower()
+        iitem = re.sub(r'\([^)]*\)', '', iitem)
+        iitem = iitem.strip()
+        iitem = iitem.replace(' ', '_')
+       
+        try:
+            c_similarity = model.similarity(word, iitem)
+        except KeyError:
+            c_similarity = 0
+        if c_similarity >= c:
+            rterms.append(iitem)
+        rterms = list(set(rterms))
+    return rterms
+        
+        
+   
+
+
